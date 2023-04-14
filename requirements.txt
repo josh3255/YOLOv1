@@ -1,0 +1,5 @@
+numpy
+cython
+ninja
+argparse
+opencv-python==4.5.5.64
