@@ -29,7 +29,12 @@ class COCODataset(Dataset):
         img = cv2.resize(img, (448, 448))
         img = img / 255.0
 
-        return torch.tensor(img), torch.tensor(target)
+        img = torch.tensor(img, dtype=torch.float32)
+        img = img.permute(2, 0, 1)
+
+        target = torch.tensor(target)
+        
+        return img ,target
 
     def __len__(self):
         return len(self.ids)
@@ -49,14 +54,3 @@ def collate_fn(batch):
         targets.append(target)
 
     return torch.stack(images), torch.stack(targets)
-
-
-def main():
-    dataset = COCODataset('/data/detection/detection/annotations/train.json')
-    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=2, shuffle=True)
-    
-    for batch_idx, sample in enumerate(dataloader):
-        print(batch_idx, len(sample))
-
-if __name__ == "__main__":
-	main()
