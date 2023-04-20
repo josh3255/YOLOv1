@@ -62,6 +62,6 @@ def stack_layers(cfg):
             in_channel, out_channel, kernel_size, stride, padding = layer
             layers.append(nn.Conv2d(in_channel, out_channel, kernel_size=kernel_size,\
                                                         stride=stride, padding=padding))
-            layers.append(nn.ReLU(inplace=True))
+            layers.append(nn.LeakyReLU(negative_slope=0.01, inplace=True))
     
     return nn.Sequential(*layers)
