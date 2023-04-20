@@ -13,7 +13,8 @@ class COCODataset(Dataset):
         self.coco = COCO(json_path)
         self.ids = list(sorted(self.coco.imgs.keys()))
 
-        self.img_size = 448
+        self.img_size = args.img_size
+        self.divisor = self.img_size // self.args.S
 
     def __getitem__(self, idx):
         img_id = self.ids[idx]
@@ -23,7 +24,7 @@ class COCODataset(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (self.img_size, self.img_size))
         img = img / 255.0
-
+        
         img = torch.tensor(img, dtype=torch.float32)
         img = img.permute(2, 0, 1)
         
@@ -42,7 +43,7 @@ class COCODataset(Dataset):
             annotations.append([x1, y1, w, h, cls])
 
         target = self.encoder(annotations)
-        
+
         if torch.cuda.is_available():
             return img.cuda(), target.cuda()
         else:
@@ -51,16 +52,13 @@ class COCODataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
-    def encoder(self, annotations):
-        
-        divisor = self.img_size // self.args.S
-
+    def encoder(self, annotations): 
         target = torch.zeros((self.args.S, self.args.S, self.args.B * 5 + self.args.C))
         
         for annotation in annotations:
             x1, y1, w, h, cls = annotation
-            cx = (x1 + (w / 2)) / divisor
-            cy = (y1 + (h / 2)) / divisor
+            cx = (x1 + (w / 2)) / self.divisor
+            cy = (y1 + (h / 2)) / self.divisor
             w = w / self.img_size
             h = h / self.img_size
 
