@@ -53,7 +53,7 @@ class COCODataset(Dataset):
 
     def encoder(self, annotations):
         
-        divisor = 448 // self.args.S
+        divisor = self.img_size // self.args.S
 
         target = torch.zeros((self.args.S, self.args.S, self.args.B * 5 + self.args.C))
         
@@ -61,21 +61,20 @@ class COCODataset(Dataset):
             x1, y1, w, h, cls = annotation
             cx = (x1 + (w / 2)) / divisor
             cy = (y1 + (h / 2)) / divisor
-            
             w = w / self.img_size
             h = h / self.img_size
 
             cell_pos_x = int(cx)
-            offset_x = cx - cell_pos_x
+            # offset_x = cx - cell_pos_x
             
             cell_pos_y = int(cy)
-            offset_y = cy - cell_pos_y
+            # offset_y = cy - cell_pos_y
             
             if target[cell_pos_x][cell_pos_y][4] != 0:
                 continue
 
-            target[cell_pos_x][cell_pos_y][0:5] = torch.tensor([offset_x, offset_y, w, h, 1])
-            target[cell_pos_x][cell_pos_y][5:10] = torch.tensor([offset_x, offset_y, w, h, 1])
+            target[cell_pos_x][cell_pos_y][0:5] = torch.tensor([cx, cy, w, h, 1])
+            target[cell_pos_x][cell_pos_y][5:10] = torch.tensor([cx, cy, w, h, 1])
             target[cell_pos_x][cell_pos_y][10+int(cls)] = 1
 
         return target
