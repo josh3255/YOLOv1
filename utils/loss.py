@@ -18,7 +18,7 @@ class YOLOLoss(nn.Module):
     def forward(self, pred, target):
         batch_size = pred.shape[0]
         
-        mse_loss = torch.nn.MSELoss(reduction='mean')
+        mse_loss = torch.nn.MSELoss()
         bce_loss = torch.nn.BCELoss()
 
         # localization loss
@@ -28,12 +28,6 @@ class YOLOLoss(nn.Module):
 
         pred_bbox1 = obj_pred[:, 0:4]
         pred_bbox2 = obj_pred[:, 5:9]
-
-        # pred_bbox1_clamped = pred_bbox1.clone()
-        # pred_bbox1[:, 2:4] = torch.clamp(pred_bbox1_clamped[:, 2:4], min=1e-6)
-        
-        # pred_bbox2_clamped = pred_bbox2.clone()
-        # pred_bbox2[:, 2:4] = torch.clamp(pred_bbox2_clamped[:, 2:4], min=1e-6)
 
         target_bbox1 = obj_target[:, 0:4]
         target_bbox2 = obj_target[:, 5:9]
@@ -66,32 +60,31 @@ class YOLOLoss(nn.Module):
                 loc_loss += mse_loss(pred_bbox2[i, :2], target_bbox2[i, :2]) + mse_loss(pred_bbox2[i, 2:4], target_bbox2[i, 2:4])
                 obj_loss += torch.pow((pred_obj2[i] - ious2[i]), 2) + self.l_noobj * torch.pow((pred_obj1[i] - 0.0), 2)
         
-        # print('pred_box1 : ', pred_bbox1[i])
-        # print('target_box1 : ', target_bbox1[i])
-
-        # print('pred_box2 : ', pred_bbox2[i])
-        # print('target_box2 : ', target_bbox2[i])
         # classification loss
         cls_loss = mse_loss(pred_class, target_class)
 
-        return loc_loss / batch_size, obj_loss / batch_size, cls_loss / batch_size
+        return self.l_coord * loc_loss, obj_loss, cls_loss
         
 def calc_iou(boxes1, boxes2):
     ious = []
+
+    img_size = 448
+    divisor = img_size // 7
+
     for box1, box2 in zip(boxes1, boxes2):
 
         x1, y1, w1, h1 = box1
         x2, y2, w2, h2 = box2
 
-        x1 = x1 * (448 // 7)
-        x2 = x2 * (448 // 7)
-        y1 = y1 * (448 // 7)
-        y2 = y2 * (448 // 7)
+        x1 = x1 * divisor
+        x2 = x2 * divisor
+        y1 = y1 * divisor
+        y2 = y2 * divisor
 
-        w1 = w1 * 448
-        h1 = h1 * 448
-        w2 = w2 * 448
-        h2 = h2 * 448
+        w1 = w1 * img_size
+        h1 = h1 * img_size
+        w2 = w2 * img_size
+        h2 = h2 * img_size
 
         # Calculate the coordinates of the intersection rectangle
         x_left = max(x1 - w1 / 2, x2 - w2 / 2)
@@ -116,7 +109,6 @@ def calc_iou(boxes1, boxes2):
         
         # Calculate the IOU
         iou = intersection_area / float(box1_area + box2_area - intersection_area)
-        
         if torch.cuda.is_available():
             iou = iou.cuda()
         
