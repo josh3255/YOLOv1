@@ -1,6 +1,7 @@
 numpy
 cython
 ninja
+logging
 argparse
 pycocotools
 opencv-python==4.5.5.64
