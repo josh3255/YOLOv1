@@ -55,10 +55,10 @@ class YOLOLoss(nn.Module):
         for i in range(len(ious1)):
             if ious1[i] > ious2[i]:
                 loc_loss += mse_loss(pred_bbox1[i, :2], target_bbox1[i, :2]) + mse_loss(pred_bbox1[i, 2:4], target_bbox1[i, 2:4])
-                obj_loss += torch.pow((pred_obj1[i] - ious1[i]), 2) + self.l_noobj * torch.pow((pred_obj2[i] - 0.0), 2)
+                obj_loss += torch.pow((pred_obj1[i] - target_obj1[i]), 2) + self.l_noobj * torch.pow((pred_obj2[i] - 0.0), 2)
             else:
                 loc_loss += mse_loss(pred_bbox2[i, :2], target_bbox2[i, :2]) + mse_loss(pred_bbox2[i, 2:4], target_bbox2[i, 2:4])
-                obj_loss += torch.pow((pred_obj2[i] - ious2[i]), 2) + self.l_noobj * torch.pow((pred_obj1[i] - 0.0), 2)
+                obj_loss += torch.pow((pred_obj2[i] - target_obj2[i]), 2) + self.l_noobj * torch.pow((pred_obj1[i] - 0.0), 2)
         
         # classification loss
         cls_loss = mse_loss(pred_class, target_class)
