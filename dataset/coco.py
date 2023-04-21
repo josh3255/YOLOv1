@@ -1,6 +1,8 @@
 import os
 import cv2
 
+import math
+
 import torch
 import torchvision
 
@@ -59,14 +61,12 @@ class COCODataset(Dataset):
             x1, y1, w, h, cls = annotation
             cx = (x1 + (w / 2)) / self.divisor
             cy = (y1 + (h / 2)) / self.divisor
-            w = w / self.img_size
-            h = h / self.img_size
 
             cell_pos_x = int(cx)
-            # offset_x = cx - cell_pos_x
+            # tx = cx - cell_pos_x
             
             cell_pos_y = int(cy)
-            # offset_y = cy - cell_pos_y
+            # ty = cy - cell_pos_y
             
             if target[cell_pos_x][cell_pos_y][4] != 0:
                 continue
