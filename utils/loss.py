@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import random
+
 class YOLOLoss(nn.Module):
     def __init__(self, args):
         super(YOLOLoss, self).__init__()
@@ -21,6 +23,8 @@ class YOLOLoss(nn.Module):
         mse_loss = torch.nn.MSELoss()
         ce_loss = torch.nn.CrossEntropyLoss()
 
+        loc_loss = 0
+
         # localization loss
         obj_mask = target[:, :, :, 4] > 0
         obj_pred = pred[obj_mask]
@@ -31,15 +35,16 @@ class YOLOLoss(nn.Module):
 
         target_bbox1 = obj_target[:, 0:4]
         target_bbox2 = obj_target[:, 5:9]
-
-        ious1 = compute_iou(pred_bbox1, target_bbox1)
-        ious2 = compute_iou(pred_bbox2, target_bbox2)
-
+        
+        # Use randomly selected boxes for regression 
+        # ious1 = compute_iou(pred_bbox1, target_bbox1)
+        # ious2 = compute_iou(pred_bbox2, target_bbox2)
+        
         # cx, cy to tx, ty after compute iou
-        int_tb1 = torch.floor(target_bbox1[:, :2])
-        target_bbox1[:, :2] = target_bbox1[:, :2] - int_tb1
-        int_tb2 = torch.floor(target_bbox2[:, :2])
-        target_bbox2[:, :2] = target_bbox2[:, :2] - int_tb2
+        # int_tb1 = torch.floor(target_bbox1[:, :2])
+        # target_bbox1[:, :2] = target_bbox1[:, :2] - int_tb1
+        # int_tb2 = torch.floor(target_bbox2[:, :2])
+        # target_bbox2[:, :2] = target_bbox2[:, :2] - int_tb2
         
         # object loss
         pred_obj1 = obj_pred[:, 4]
@@ -53,24 +58,24 @@ class YOLOLoss(nn.Module):
         loc_loss = 0
         obj_loss = 0
         noobj_loss = 0
-
-        for i in range(len(ious1)):
-            if ious1[i] > ious2[i]:
+        
+        for i in range(len(pred_bbox1)):
+            if random.random() > 0.5:
                 loc_loss += mse_loss(pred_bbox1[i, :2], target_bbox1[i, :2]) \
-                        + mse_loss(torch.sqrt(torch.abs(pred_bbox1[i, 2:4]) + 1e-6), torch.sqrt(target_bbox1[i, 2:4]))
-                obj_loss += mse_loss(pred_obj1[i] * ious1[i], target_obj1[i])
+                        + mse_loss(pred_bbox1[i, 2:4], torch.sqrt(target_bbox1[i, 2:4]))
+                obj_loss += mse_loss(pred_obj1[i], target_obj1[i])
             else:
                 loc_loss += mse_loss(pred_bbox2[i, :2], target_bbox2[i, :2]) \
-                        + mse_loss(torch.sqrt(torch.abs(pred_bbox2[i, 2:4]) + 1e-6), torch.sqrt(target_bbox2[i, 2:4]))
-                obj_loss += mse_loss(pred_obj2[i] * ious2[i], target_obj2[i])
+                        + mse_loss(pred_bbox2[i, 2:4], torch.sqrt(target_bbox2[i, 2:4]))
+                obj_loss += mse_loss(pred_obj2[i], target_obj2[i]) 
         
-        # noobject loss
+        # noobject loc loss
         noobj_mask = target[:, :, :, 4] == 0
         noobj_pred = pred[noobj_mask]
         noobj_target = target[noobj_mask]
 
-        noobj_loss += self.l_noobj * (mse_loss(noobj_pred[:, 4] * ious1, noobj_target[:, 4]) \
-                                    + mse_loss(noobj_pred[:, 9] * ious2, noobj_target[:, 9]))
+        noobj_loss = self.l_noobj * (mse_loss(noobj_pred[:, 4], noobj_target[:, 4]) \
+                                    + mse_loss(noobj_pred[:, 9], noobj_target[:, 9]))
 
         # classification loss
         pred_class = F.softmax(pred_class, dim=1)
