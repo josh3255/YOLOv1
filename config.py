@@ -8,14 +8,20 @@ def get_args():
     parser.add_argument('--val-ann', type=str, default='/data/detection/detection/annotations/val.json', help='COCO format val json')
 
     # training args
+    parser.add_argument('--img-size', type=int, default=448, help='')
     parser.add_argument('--batch-size', type=int, default=8, help='')
     parser.add_argument('--max-epoch', type=int, default=135, help='' )
     parser.add_argument('--eval-interval', type=int, default=5, help='')
-    parser.add_argument('--learning-rate', type=float, default=0.0003, help='')
+    parser.add_argument('--learning-rate', type=float, default=7e-5, help='')
     parser.add_argument('--momentum', type=float, default=0.9, help='')
     parser.add_argument('--weight-decay', type=float, default=0.0005, help='')
     parser.add_argument('--dropout', type=float, default=0.5, help='')
     parser.add_argument('--resume', type=str, default='', help='')
+
+    # demo args
+    parser.add_argument('--source', type=str, default='', help='')
+    parser.add_argument('--output', type=str, default='./demo', help='')
+    parser.add_argument('--weights', type=str, default='', help='')
 
     # loss args
     parser.add_argument('--l-coord', type=float, default=5.0, help='')

@@ -6,6 +6,9 @@ import math
 import torch
 import torchvision
 
+import albumentations as A
+from albumentations.pytorch.transforms import ToTensorV2
+
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
 
@@ -16,7 +19,14 @@ class COCODataset(Dataset):
         self.ids = list(sorted(self.coco.imgs.keys()))
 
         self.img_size = args.img_size
-        self.divisor = self.img_size // self.args.S
+        self.cell_size = self.img_size // self.args.S
+
+        self.transforms = A.Compose([
+            A.Resize(self.img_size, self.img_size),
+            A.RandomCrop(self.img_size, self.img_size, p=0.2),
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
+            ToTensorV2(),
+        ], bbox_params={'format' : 'coco'})
 
     def __getitem__(self, idx):
         img_id = self.ids[idx]
@@ -24,27 +34,21 @@ class COCODataset(Dataset):
         
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (self.img_size, self.img_size))
-        img = img / 255.0
 
-        img = torch.tensor(img, dtype=torch.float32)
-        img = img.permute(2, 0, 1)
-        
         ann_ids = self.coco.getAnnIds(imgIds=img_id)
         anns = self.coco.loadAnns(ann_ids)
         
-        annotations = []
+        bboxes = []
         for ann in anns:
             x1, y1, w, h = ann['bbox']
-
-            x1 = x1 / self.coco.imgs[img_id]['width'] * self.img_size
-            y1 = y1 / self.coco.imgs[img_id]['height'] * self.img_size
-            w = w / self.coco.imgs[img_id]['width'] * self.img_size
-            h = h / self.coco.imgs[img_id]['height'] * self.img_size
             cls = ann['category_id'] - 1
-            annotations.append([x1, y1, w, h, cls])
-
-        target = self.encoder(annotations)
+            bboxes.append([x1, y1, w, h, cls])
+        
+        augmented = self.transforms(image=img, bboxes=bboxes)
+        img = augmented['image'].float() / 255.0
+        bboxes = augmented['bboxes']
+        
+        target = self.encoder(bboxes)
 
         if torch.cuda.is_available():
             return img.cuda(), target.cuda()
@@ -54,26 +58,27 @@ class COCODataset(Dataset):
     def __len__(self):
         return len(self.ids)
 
-    def encoder(self, annotations): 
+    def encoder(self, bboxes): 
         target = torch.zeros((self.args.S, self.args.S, self.args.B * 5 + self.args.C))
         
-        for annotation in annotations:
-            x1, y1, w, h, cls = annotation
-            cx = (x1 + (w / 2)) / self.divisor
-            cy = (y1 + (h / 2)) / self.divisor
+        for bbox in bboxes:
+            x1, y1, w, h, cls = bbox
+            cx = (x1 + (w / 2))
+            cy = (y1 + (h / 2))
+            w = math.sqrt(w)
+            h = math.sqrt(h)
 
-            cell_pos_x = int(cx)
-            # tx = cx - cell_pos_x
-            
-            cell_pos_y = int(cy)
-            # ty = cy - cell_pos_y
-            
-            if target[cell_pos_x][cell_pos_y][4] != 0:
+            cell_x = cx / self.cell_size
+            tx = cell_x - int(cell_x)
+
+            cell_y = cy / self.cell_size
+            ty = cell_y - int(cell_y)
+
+            if target[int(cell_x)][int(cell_y)][4] != 0:
                 continue
 
-            target[cell_pos_x][cell_pos_y][0:5] = torch.tensor([cx, cy, w, h, 1])
-            target[cell_pos_x][cell_pos_y][5:10] = torch.tensor([cx, cy, w, h, 1])
-            target[cell_pos_x][cell_pos_y][10+int(cls)] = 1
-            target[cell_pos_x][cell_pos_y][5 * self.args.B + int(cls)] = 1
+            target[int(cell_x)][int(cell_y)][0:5] = torch.tensor([tx, ty, w, h, 1])
+            target[int(cell_x)][int(cell_y)][5:10] = torch.tensor([tx, ty, w, h, 1])
+            target[int(cell_x)][int(cell_y)][5 * self.args.B + int(cls)] = 1
 
         return target
