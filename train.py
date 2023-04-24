@@ -39,16 +39,17 @@ def train(args):
         checkpoint = torch.load(args.resume)
         model.load_state_dict(checkpoint['model_state_dict'])
 
+    torch.autograd.set_detect_anomaly(True)
     # Model Training
     for epoch in range(args.max_epoch):
         epoch_loss = 0.0
 
-        model.train()    
+        model.train()
         for batch_idx, (inputs, targets) in enumerate(train_dataloader):
             outputs = model(inputs)
 
-            loc_loss, obj_loss, cls_loss = criterion(outputs, targets)
-            total_loss = loc_loss + obj_loss + cls_loss
+            loc_loss, cls_loss, obj_loss, noobj_loss = criterion(outputs, targets)
+            total_loss = loc_loss + cls_loss + obj_loss + noobj_loss
             epoch_loss = epoch_loss + total_loss.item()
 
             optimizer.zero_grad()
@@ -56,15 +57,15 @@ def train(args):
             optimizer.step()
 
             if batch_idx % 10 == 0:
-                logger.info('step : {}/{} || total loss : {:.3f} || Localization Loss : {:.3f} || Classification Loss : {:.3f} || Objectness Loss : {:.3f}'\
-                                .format(batch_idx + 1, len(train_dataloader), total_loss.item() / args.batch_size, loc_loss.item() / args.batch_size, cls_loss.item() / args.batch_size, obj_loss.item() / args.batch_size))
+                logger.info('step : {}/{} || total loss : {:.3f} || loc loss : {:.3f} || cls loss : {:.3f} || obj loss : {:.3f} || noobj loss : {:.3f}'\
+                                .format(batch_idx + 1, len(train_dataloader), total_loss.item() / args.batch_size, loc_loss.item() / args.batch_size, cls_loss.item() / args.batch_size, obj_loss.item() / args.batch_size, noobj_loss.item() / args.batch_size))
 
         scheduler.step()
 
         logger.info('epoch : {}/{} || epoch loss : {:.3f}'.format(epoch + 1, args.max_epoch, epoch_loss / len(train_dataloader) / args.batch_size))
 
         torch.save({
-            'model_state_dict' : model.state_dict(),
+            'model_state_dict' : model.module.state_dict(),
             # 'optim_state_dict' : optimizer.state_dict()
         }, 'weights/last.pt')
                 
