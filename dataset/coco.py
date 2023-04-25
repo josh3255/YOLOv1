@@ -6,11 +6,16 @@ import math
 import torch
 import torchvision
 
+from utils.utils import get_all_files_in_folder
+
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
+
+image_extensions = ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'webp']
+video_extensions = ['mp4', 'avi', 'wmv', 'mov', 'flv', 'mkv', 'mpeg', 'webm']
 
 class COCODataset(Dataset):
     def __init__(self, args, json_path):
@@ -23,8 +28,8 @@ class COCODataset(Dataset):
 
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
-            A.RandomCrop(self.img_size, self.img_size, p=0.2),
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
+            # A.RandomCrop(self.img_size, self.img_size, p=0.2),
+            # A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
             ToTensorV2(),
         ], bbox_params={'format' : 'coco'})
 
@@ -47,7 +52,6 @@ class COCODataset(Dataset):
         augmented = self.transforms(image=img, bboxes=bboxes)
         img = augmented['image'].float() / 255.0
         bboxes = augmented['bboxes']
-        
         target = self.encoder(bboxes)
 
         if torch.cuda.is_available():
@@ -77,8 +81,43 @@ class COCODataset(Dataset):
             if target[int(cell_x)][int(cell_y)][4] != 0:
                 continue
 
-            target[int(cell_x)][int(cell_y)][0:5] = torch.tensor([tx, ty, w, h, 1])
-            target[int(cell_x)][int(cell_y)][5:10] = torch.tensor([tx, ty, w, h, 1])
-            target[int(cell_x)][int(cell_y)][5 * self.args.B + int(cls)] = 1
+            target[int(cell_x)][int(cell_y)][0:5] = torch.tensor([tx, ty, w, h, 1.0])
+            target[int(cell_x)][int(cell_y)][5:10] = torch.tensor([tx, ty, w, h, 1.0])
+            target[int(cell_x)][int(cell_y)][5 * self.args.B + int(cls)] = 1.0
 
         return target
+
+class TestDataset(Dataset):
+    def __init__(self, args, path):
+        self.args = args
+
+        self.img_size = args.img_size
+        
+        self.transforms = A.Compose([
+            A.Resize(self.img_size, self.img_size),
+            ToTensorV2(),
+        ])
+
+        self.imgs = []
+        if os.path.isdir(path):
+            self.imgs = get_all_files_in_folder(path)
+            self.imgs = [img for img in self.imgs if img.split('.')[-1] in image_extensions]
+        elif path.split('.')[-1] in image_extensions:
+            self.imgs.append(path)
+        elif path.split('.')[-1] in video_extensions:
+            print('Not Implemented')
+        
+        # print(self.imgs)
+            
+    def __getitem__(self, idx):
+        img = self.imgs[idx]
+        img = cv2.imread(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        augmented = self.transforms(image=img)
+        img = augmented['image'].float() / 255.0
+
+        return img
+
+    def __len__(self):
+        return len(self.imgs)
