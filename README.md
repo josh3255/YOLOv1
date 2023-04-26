@@ -57,7 +57,6 @@ pip install -r requirements.txt
 
 2. Modify the config.py file to match your env (batch size, lr, num of class, etc..).
 
-***
 
 ## Training
 
