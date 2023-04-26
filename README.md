@@ -10,7 +10,6 @@ This code follows the contents of the paper as much as possible, but has the fol
 
 3. Confidence and class probability pass through the sigmoid layer.
 
-***
 
 ## TODO
 
@@ -21,7 +20,6 @@ This code follows the contents of the paper as much as possible, but has the fol
 - [ ] video demo
 - [ ] upload pretrained weights
 
-***
 
 ## Installation
 
@@ -52,7 +50,6 @@ nvidia-docker run --name yolov1 -it -v /your/data/path:/data/ -v /your/projects/
 pip install -r requirements.txt
 ```
 
-***
 
 ## Before Training
 
@@ -68,7 +65,6 @@ pip install -r requirements.txt
 python train.py --resume weights/path
 ```
 
-***
 
 ## Demo
 
@@ -84,5 +80,3 @@ mkdir demo
 python demo.py --weights weights/path --source img/or/folder/path
 ```
 
-
-***
