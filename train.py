@@ -8,6 +8,7 @@ import logging
 from utils.loss import YOLOLoss
 from models.yolo import YOLO
 from config import get_args
+from dataset.coco import TestDataset
 from dataset.coco import COCODataset
 
 def train(args):
@@ -17,7 +18,7 @@ def train(args):
     # dataloader
     train_dataset = COCODataset(args, args.train_ann)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    
+
     # Model Set-up
     model = YOLO(args)
 
@@ -58,14 +59,19 @@ def train(args):
 
             if batch_idx % 10 == 0:
                 logger.info('step : {}/{} || total loss : {:.3f} || loc loss : {:.3f} || cls loss : {:.3f} || obj loss : {:.3f} || noobj loss : {:.3f}'\
-                                .format(batch_idx + 1, len(train_dataloader), total_loss.item() / args.batch_size, loc_loss.item() / args.batch_size, cls_loss.item() / args.batch_size, obj_loss.item() / args.batch_size, noobj_loss.item() / args.batch_size))
+                                .format(batch_idx + 1, len(train_dataloader), total_loss.item(), loc_loss.item(), cls_loss.item(), obj_loss.item(), noobj_loss.item()))
 
         scheduler.step()
 
-        logger.info('epoch : {}/{} || epoch loss : {:.3f}'.format(epoch + 1, args.max_epoch, epoch_loss / len(train_dataloader) / args.batch_size))
+        logger.info('epoch : {}/{} || epoch loss : {:.3f}'.format(epoch + 1, args.max_epoch, epoch_loss / len(train_dataloader)))
 
+        if epoch % 10 == 0:
+            torch.save({
+                'model_state_dict' : model.state_dict(),
+                # 'optim_state_dict' : optimizer.state_dict()
+            }, 'weights/epoch{}.pt'.format(epoch))     
         torch.save({
-            'model_state_dict' : model.module.state_dict(),
+            'model_state_dict' : model.state_dict(),
             # 'optim_state_dict' : optimizer.state_dict()
         }, 'weights/last.pt')
                 
