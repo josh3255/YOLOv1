@@ -21,8 +21,6 @@ class YOLOLoss(nn.Module):
         self.ce_loss = torch.nn.CrossEntropyLoss()
         
     def forward(self, pred, target):
-        # Due to the bias that occurs during the learning process, do not use reponsible.
-
         batch_size = pred.shape[0]
 
         loc_loss = 0
@@ -46,18 +44,20 @@ class YOLOLoss(nn.Module):
         target_obj = obj_target[:, 4]
         target_class = obj_target[:, 5 * self.B : 5 * self.B + self.C]
         
-        # (obj) localization loss & objectness loss
+        # (obj) localization loss & objectness loss        
         # Use random selected boxes for regression
-        if random.random() > 0.5:
-            loc_loss += self.mse_loss(pred_bbox1, target_bbox)
-            obj_loss += self.mse_loss(pred_obj1, target_obj)
-        else:
-            loc_loss += self.mse_loss(pred_bbox2, target_bbox)
-            obj_loss += self.mse_loss(pred_obj2, target_obj)
-        
+        # if random.random() > 0.5:
+        #     loc_loss += self.mse_loss(pred_bbox1, target_bbox)
+        #     obj_loss += self.mse_loss(pred_obj1, target_obj)
+        # else:
+        #     loc_loss += self.mse_loss(pred_bbox2, target_bbox)
+        #     obj_loss += self.mse_loss(pred_obj2, target_obj)
+
+        loc_loss += self.mse_loss(pred_bbox1, target_bbox)
+        obj_loss += self.mse_loss(pred_obj1, target_obj)
+
         # (obj) classification loss
         cls_loss += self.mse_loss(pred_class, target_class)
-        
         
         noobj_mask = target[:, :, :, 4] == 0
         noobj_pred = pred[noobj_mask]
@@ -76,14 +76,14 @@ class YOLOLoss(nn.Module):
         noobj_target_class = noobj_target[:, 5 * self.B : 5 * self.B + self.C]
 
         # (noobj) localization loss
-        noobj_loss += self.mse_loss(noobj_pred_bbox1, noobj_target_bbox)
-        noobj_loss += self.mse_loss(noobj_pred_bbox2, noobj_target_bbox)
+        # noobj_loss += self.mse_loss(noobj_pred_bbox1, noobj_target_bbox)
+        # noobj_loss += self.mse_loss(noobj_pred_bbox2, noobj_target_bbox)
 
         # (noobj) objectness loss
         noobj_loss += self.mse_loss(noobj_pred_obj1, noobj_target_obj)
         noobj_loss += self.mse_loss(noobj_pred_obj2, noobj_target_obj)
 
         # (noobj) classification loss
-        noobj_loss += self.mse_loss(noobj_pred_class, noobj_target_class)
+        # noobj_loss += self.mse_loss(noobj_pred_class, noobj_target_class)
 
         return self.l_coord * loc_loss / batch_size, cls_loss / batch_size, obj_loss / batch_size, self.l_noobj * noobj_loss / batch_size
