@@ -28,8 +28,8 @@ class COCODataset(Dataset):
 
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
-            # A.RandomCrop(self.img_size, self.img_size, p=0.2),
-            # A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
+            A.RandomCrop(self.img_size, self.img_size, p=0.2),
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
             ToTensorV2(),
         ], bbox_params={'format' : 'coco'})
 
@@ -110,14 +110,29 @@ class TestDataset(Dataset):
         # print(self.imgs)
             
     def __getitem__(self, idx):
-        img = self.imgs[idx]
-        img = cv2.imread(img)
+        img_path = self.imgs[idx]
+        img = cv2.imread(img_path)
+
+        ori_img = img.copy()
+        ori_img = cv2.resize(ori_img, (self.img_size, self.img_size))
+
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
         augmented = self.transforms(image=img)
         img = augmented['image'].float() / 255.0
 
-        return img
+        return img, ori_img, img_path
 
     def __len__(self):
         return len(self.imgs)
+
+def collate_fn(batch):
+    images = []
+    ori_images = []
+    file_paths = []
+
+    for image, ori_img, path in batch:
+        images.append(image)
+        ori_images.append(ori_img)
+        file_paths.append(path)
+    
+    return torch.stack(images), ori_images, file_paths
