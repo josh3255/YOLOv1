@@ -5,7 +5,8 @@ def get_args():
 
     # dataset args
     parser.add_argument('--train-ann', type=str, default='/data/detection/detection/annotations/coco_train.json', help='COCO format train json')
-    parser.add_argument('--val-ann', type=str, default='/data/detection/detection/annotations/val.json', help='COCO format val json')
+    parser.add_argument('--val-ann', type=str, default='/data/detection/detection/annotations/coco_val.json', help='COCO format val json')
+    parser.add_argument('--results', type=str, default='./results.json', help='COCO format results json to model evaluation')
 
     # training args
     parser.add_argument('--img-size', type=int, default=448, help='')
