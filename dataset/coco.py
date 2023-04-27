@@ -90,6 +90,37 @@ class COCODataset(Dataset):
 
         return target
 
+class ValDataset(Dataset):
+    def __init__(self, args, json_path):
+        self.args = args
+        self.coco = COCO(json_path)
+        self.ids = list(sorted(self.coco.imgs.keys()))
+
+        self.img_size = args.img_size
+
+        self.transforms = A.Compose([
+            A.Resize(self.img_size, self.img_size),
+            ToTensorV2(),
+        ])
+
+    def __getitem__(self, idx):
+        img_id = self.ids[idx]
+        img_path = self.coco.loadImgs(img_id)[0]['file_name']
+        
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        augmented = self.transforms(image=img)
+        img = augmented['image'].float() / 255.0
+        
+        if torch.cuda.is_available():
+            return torch.tensor(img_id).cuda(), img.cuda()
+        else:
+            return torch.tensor(img_id), img
+
+    def __len__(self):
+        return len(self.ids)
+
 class TestDataset(Dataset):
     def __init__(self, args, path):
         self.args = args
