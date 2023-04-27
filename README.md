@@ -17,7 +17,7 @@ This code follows the contents of the paper as much as possible, but has the fol
 - [x] data augmentation
 - [x] add demo.py
 - [x] non-maximum suppression
-- [ ] validation term in train.py
+- [x] add val.py
 - [ ] video demo
 - [ ] upload pretrained weights
 
@@ -68,7 +68,27 @@ pip install -r requirements.txt
 python train.py --resume weights/path
 ```
 
+## Evaluation
 
+```shell
+python val.py --weights weights/path --val-ann validation/json/path
+```
+
+### Output
+```shell
+Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.373
+Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.590
+Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.402
+Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.219
+Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.409
+Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.481
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.310
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.495
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.521
+Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.323
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.560
+Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.667
+```
 
 ## Demo
 
