@@ -12,8 +12,14 @@ from dataset.coco import TestDataset
 from dataset.coco import COCODataset
 
 def train(args):
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('YOLOv1')
+    # logger
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger('train')
+
+    file_handler = logging.FileHandler('train.log')
+    file_handler.setLevel(logging.DEBUG)
+
+    logger.addHandler(file_handler)
 
     # dataloader
     train_dataset = COCODataset(args, args.train_ann)
@@ -28,7 +34,7 @@ def train(args):
     model = torch.nn.DataParallel(model, device_ids=range(device_count))
     for i in range(device_count):
         model.to(devices[i])
-
+    
     # Loss, Optim, and Scheduler Set-up
     criterion = YOLOLoss(args)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,\
@@ -37,10 +43,10 @@ def train(args):
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epoch)
 
     if args.resume != '':
-        checkpoint = torch.load(args.resume)
+        checkpoint = torch.load(args.resume, map_location=torch.device('cpu'))
+        optimizer.param_groups[0]['lr'] = checkpoint['lr']
         model.load_state_dict(checkpoint['model_state_dict'])
 
-    torch.autograd.set_detect_anomaly(True)
     # Model Training
     for epoch in range(args.max_epoch):
         epoch_loss = 0.0
@@ -57,24 +63,23 @@ def train(args):
             total_loss.backward()
             optimizer.step()
 
-            if batch_idx % 10 == 0:
+            if batch_idx % 50 == 0:
                 logger.info('step : {}/{} || total loss : {:.3f} || loc loss : {:.3f} || cls loss : {:.3f} || obj loss : {:.3f} || noobj loss : {:.3f}'\
                                 .format(batch_idx + 1, len(train_dataloader), total_loss.item(), loc_loss.item(), cls_loss.item(), obj_loss.item(), noobj_loss.item()))
-
-        scheduler.step()
-
+        
         logger.info('epoch : {}/{} || epoch loss : {:.3f}'.format(epoch + 1, args.max_epoch, epoch_loss / len(train_dataloader)))
+        
+        scheduler.step()
 
         if epoch % 10 == 0:
             torch.save({
                 'model_state_dict' : model.state_dict(),
-                # 'optim_state_dict' : optimizer.state_dict()
-            }, 'weights/epoch{}.pt'.format(epoch))     
+                'lr' : optimizer.param_groups[0]['lr'],
+            }, 'weights/epoch{}.pt'.format(epoch))
         torch.save({
             'model_state_dict' : model.state_dict(),
-            # 'optim_state_dict' : optimizer.state_dict()
+            'lr' : optimizer.param_groups[0]['lr'],
         }, 'weights/last.pt')
-                
 
 def main():
     args = get_args()
