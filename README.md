@@ -92,7 +92,7 @@ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.667
 
 ## Demo
 
-1. make directory to save results
+1. Make a directory to save the results.
 
 ``` shell
 mkdir demo
