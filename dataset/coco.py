@@ -47,6 +47,9 @@ class COCODataset(Dataset):
         for ann in anns:
             x1, y1, w, h = ann['bbox']
             cls = ann['category_id'] - 1
+
+            if w <= 0 or h <= 0:
+                continue
             bboxes.append([x1, y1, w, h, cls])
         
         augmented = self.transforms(image=img, bboxes=bboxes)
