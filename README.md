@@ -56,10 +56,9 @@ pip install -r requirements.txt
 
 ## Before Training
 
-1. Currently, only support training to COCO format. Please prepare images and json file before training.
+1. Prepare COCO format json
 
-2. Modify the config.py file to match your env (batch size, lr, num of class, etc..).
-
+2. Modify Config.py
 
 
 ## Training
@@ -101,7 +100,7 @@ mkdir demo
 2. Run
 
 ```shell
-python demo.py --weights weights/path --source img/or/folder/path
+python demo.py --weights weights/path --source [img, vid, folder]/path
 ```
 
 

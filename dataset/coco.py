@@ -124,40 +124,57 @@ class ValDataset(Dataset):
 class TestDataset(Dataset):
     def __init__(self, args, path):
         self.args = args
+        self.path = path
 
         self.img_size = args.img_size
-        
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
             ToTensorV2(),
         ])
 
-        self.imgs = []
         if os.path.isdir(path):
-            self.imgs = get_all_files_in_folder(path)
-            self.imgs = [img for img in self.imgs if img.split('.')[-1] in image_extensions]
-        elif path.split('.')[-1] in image_extensions:
-            self.imgs.append(path)
-        elif path.split('.')[-1] in video_extensions:
-            print('Not Implemented')
-        
-        # print(self.imgs)
+            file_list = os.listdir(path)
+            self.files = sorted([f for f in file_list if f.split('.')[-1].lower() in image_extensions])
+        elif os.path.isfile(path):
+            ext = path.split('.')[-1].lower()
+            if ext in image_extensions:
+                self.files = [path]
+            elif ext in video_extensions:
+                self.cap = cv2.VideoCapture(path)
+                self.n_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    def __getitem__(self, index):
+        if hasattr(self, 'files'):
+            img = cv2.imread(os.path.join(self.path, self.files[index]))
+            ori_img = img.copy()
+            ori_img = cv2.resize(ori_img, (self.img_size, self.img_size))
+
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            augmented = self.transforms(image=img)
+            img = augmented['image'].float() / 255.0
+
+            return img, ori_img, os.path.join(self.path, self.files[index])
+
+        elif hasattr(self, 'cap'):
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+            ret, frame = self.cap.read()
+            if not ret:
+                raise ValueError('Failed to read frame')
             
-    def __getitem__(self, idx):
-        img_path = self.imgs[idx]
-        img = cv2.imread(img_path)
+            ori_frame = frame.copy()
+            ori_frame = cv2.resize(ori_frame, (self.img_size, self.img_size))
 
-        ori_img = img.copy()
-        ori_img = cv2.resize(ori_img, (self.img_size, self.img_size))
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            augmented = self.transforms(image=frame)
+            frame = augmented['image'].float() / 255.0
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        augmented = self.transforms(image=img)
-        img = augmented['image'].float() / 255.0
-
-        return img, ori_img, img_path
+            return frame, ori_frame, 'cap'
 
     def __len__(self):
-        return len(self.imgs)
+        if hasattr(self, 'files'):
+            return len(self.files)
+        else:
+            return self.n_frames
 
 def collate_fn(batch):
     images = []
