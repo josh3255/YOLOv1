@@ -4,6 +4,7 @@ import torch
 import logging
 
 import numpy as np
+from tqdm import tqdm
 
 from collections import OrderedDict
 
@@ -13,6 +14,9 @@ from dataset.coco import TestDataset, collate_fn
 from utils.utils import post_processing, draw_bbox
 from utils.utils import non_max_suppression
 from torch.utils.data import DataLoader
+
+image_extensions = ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'webp']
+video_extensions = ['mp4', 'avi', 'wmv', 'mov', 'flv', 'mkv', 'mpeg', 'webm']
 
 def demo(args):
     logging.basicConfig(level=logging.INFO)
@@ -37,8 +41,17 @@ def demo(args):
         checkpoint = torch.load(args.weights)
         model.load_state_dict(checkpoint['model_state_dict'])
 
+    is_vid = args.source.split('.')[-1].lower() in video_extensions
+    is_img = args.source.split('.')[-1].lower() in image_extensions
+
+    if is_vid:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        vid_path = './demo/{}'.format(args.source.split('/')[-1])
+        frame_size = (args.img_size, args.img_size)
+        out = cv2.VideoWriter(vid_path, fourcc ,30, frame_size)
+
     with torch.no_grad():
-        for batch_idx, (inp, img, path) in enumerate(test_dataloader):
+        for batch_idx, (inp, img, path) in enumerate(tqdm(test_dataloader)):
             output = model(inp)
             output = output.view(7, 7, 5 * args.B + args.C)
             
@@ -50,7 +63,11 @@ def demo(args):
             path = path[0]
             for bbox, score, cls in zip(bboxes, scores, classes):
                 img = draw_bbox(img, bbox, cls.item(), score.item())
-            cv2.imwrite('./demo/{}'.format(path.split('/')[-1]), img) 
+            
+            if is_vid:
+                out.write(img)
+            else:
+                cv2.imwrite('./demo/{}'.format(path.split('/')[-1]), img) 
 
 def main():
     args = get_args()
