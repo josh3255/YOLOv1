@@ -28,8 +28,8 @@ class COCODataset(Dataset):
 
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
-            A.RandomCrop(self.img_size, self.img_size, p=0.2),
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
+            # A.RandomCrop(self.img_size, self.img_size, p=0.2),
+            # A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
             ToTensorV2(),
         ], bbox_params={'format' : 'coco'})
 
@@ -134,44 +134,36 @@ class TestDataset(Dataset):
 
         if os.path.isdir(path):
             file_list = os.listdir(path)
-            self.files = sorted([f for f in file_list if f.split('.')[-1].lower() in image_extensions])
+            self.files = sorted([os.path.join(path, f) for f in file_list if f.split('.')[-1].lower() in image_extensions])
         elif os.path.isfile(path):
             ext = path.split('.')[-1].lower()
             if ext in image_extensions:
                 self.files = [path]
             elif ext in video_extensions:
+                self.files = None
                 self.cap = cv2.VideoCapture(path)
                 self.n_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     def __getitem__(self, index):
-        if hasattr(self, 'files'):
-            img = cv2.imread(os.path.join(self.path, self.files[index]))
-            ori_img = img.copy()
-            ori_img = cv2.resize(ori_img, (self.img_size, self.img_size))
-
+        if self.files is not None:
+            img = cv2.imread(self.files[index])
+            ori_img = cv2.resize(img.copy(), (self.img_size, self.img_size))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            augmented = self.transforms(image=img)
-            img = augmented['image'].float() / 255.0
-
-            return img, ori_img, os.path.join(self.path, self.files[index])
-
-        elif hasattr(self, 'cap'):
+        else:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, index)
-            ret, frame = self.cap.read()
+            ret, img = self.cap.read()
             if not ret:
                 raise ValueError('Failed to read frame')
-            
-            ori_frame = frame.copy()
-            ori_frame = cv2.resize(ori_frame, (self.img_size, self.img_size))
+            ori_img = cv2.resize(img.copy(), (self.img_size, self.img_size))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            augmented = self.transforms(image=frame)
-            frame = augmented['image'].float() / 255.0
+        augmented = self.transforms(image=img)
+        img = augmented['image'].float() / 255.0
 
-            return frame, ori_frame, 'cap'
+        return img, ori_img, self.files[index]
 
     def __len__(self):
-        if hasattr(self, 'files'):
+        if self.files is not None:
             return len(self.files)
         else:
             return self.n_frames
