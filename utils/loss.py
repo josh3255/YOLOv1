@@ -19,71 +19,70 @@ class YOLOLoss(nn.Module):
 
         self.mse_loss = torch.nn.MSELoss()
         self.ce_loss = torch.nn.CrossEntropyLoss()
+    
+    def compute_iou(self, pred, target):
+        # pred: [x1, y1, x2, y2]
+        # target: [x1, y1, x2, y2]
         
+        # Get coordinates of intersection rectangle
+        x1 = max(pred[0], target[0])
+        y1 = max(pred[1], target[1])
+        x2 = min(pred[2], target[2])
+        y2 = min(pred[3], target[3])
+
+        # Calculate area of intersection rectangle
+        intersection = max(0, x2 - x1 + 1) * max(0, y2 - y1 + 1)
+
+        # Calculate area of union rectangle
+        pred_area = (pred[2] - pred[0] + 1) * (pred[3] - pred[1] + 1)
+        target_area = (target[2] - target[0] + 1) * (target[3] - target[1] + 1)
+        union = pred_area + target_area - intersection
+
+        # Calculate IoU
+        iou = intersection / union
+
+        return iou
+
     def forward(self, pred, target):
         batch_size = pred.shape[0]
 
-        loc_loss = 0
-        obj_loss = 0
-        cls_loss = 0
-        noobj_loss = 0
-
         obj_mask = target[:, :, :, 4] > 0
+        noobj_mask = target[:, :, :, 4] == 0
+
         obj_pred = pred[obj_mask]
+        noobj_pred = pred[noobj_mask]
         obj_target = target[obj_mask]
-        
-        pred_bbox1 = obj_pred[:, 0:4]
+        noobj_target = target[noobj_mask]
+
+        pred_bbox1 = obj_pred[:, :4]
         pred_bbox2 = obj_pred[:, 5:9]
 
         pred_obj1 = obj_pred[:, 4]
         pred_obj2 = obj_pred[:, 9]
 
-        pred_class = obj_pred[:, 5 * self.B : 5 * self.B + self.C]
+        pred_cls = obj_pred[:, 10:]
 
-        target_bbox = obj_target[:, 0:4]
-        target_obj = obj_target[:, 4]
-        target_class = obj_target[:, 5 * self.B : 5 * self.B + self.C]
+        target_bbox1 = obj_target[:, :4]
+        target_bbox2 = obj_target[:, 5:9]
+
+        target_obj1 = obj_target[:, 4]
+        target_obj2 = obj_target[:, 9]
+
+        target_cls = obj_target[:, 10:]
         
-        # (obj) localization loss & objectness loss        
-        # Use random selected boxes for regression
-        # if random.random() > 0.5:
-        #     loc_loss += self.mse_loss(pred_bbox1, target_bbox)
-        #     obj_loss += self.mse_loss(pred_obj1, target_obj)
-        # else:
-        #     loc_loss += self.mse_loss(pred_bbox2, target_bbox)
-        #     obj_loss += self.mse_loss(pred_obj2, target_obj)
+        # If you want to backward by selecting a box with a high iou instead of random backward
+        # you can remove the below and implement it using compute_iou function.
 
-        loc_loss += self.mse_loss(pred_bbox1, target_bbox)
-        obj_loss += self.mse_loss(pred_obj1, target_obj)
-
-        # (obj) classification loss
-        cls_loss += self.mse_loss(pred_class, target_class)
+        # Due to the bias that occurs during learning, do not use reponsible.
+        if random.random() > 0.5:
+            loc_loss = self.mse_loss(pred_bbox1, target_bbox1)
+            obj_loss = self.mse_loss(pred_obj1, target_obj1)
+        else:
+            loc_loss = self.mse_loss(pred_bbox2, target_bbox2)
+            obj_loss = self.mse_loss(pred_obj2, target_obj2)
         
-        noobj_mask = target[:, :, :, 4] == 0
-        noobj_pred = pred[noobj_mask]
-        noobj_target = target[noobj_mask]
-
-        noobj_pred_bbox1 = noobj_pred[:, 0:4]
-        noobj_pred_bbox2 = noobj_pred[:, 5:9]
-
-        noobj_pred_obj1 = noobj_pred[:, 4]
-        noobj_pred_obj2 = noobj_pred[:, 9]
-
-        noobj_pred_class = noobj_pred[:, 5 * self.B : 5 * self.B + self.C]
-
-        noobj_target_bbox = noobj_target[:, :4]
-        noobj_target_obj = noobj_target[:, 4]
-        noobj_target_class = noobj_target[:, 5 * self.B : 5 * self.B + self.C]
-
-        # (noobj) localization loss
-        # noobj_loss += self.mse_loss(noobj_pred_bbox1, noobj_target_bbox)
-        # noobj_loss += self.mse_loss(noobj_pred_bbox2, noobj_target_bbox)
-
-        # (noobj) objectness loss
-        noobj_loss += self.mse_loss(noobj_pred_obj1, noobj_target_obj)
-        noobj_loss += self.mse_loss(noobj_pred_obj2, noobj_target_obj)
-
-        # (noobj) classification loss
-        # noobj_loss += self.mse_loss(noobj_pred_class, noobj_target_class)
+        cls_loss = self.mse_loss(pred_cls, target_cls)
+        noobj_loss = self.mse_loss(noobj_pred[:, 4], noobj_target[:, 4]) + \
+                        self.mse_loss(noobj_pred[:, 9], noobj_target[:, 9])
 
         return self.l_coord * loc_loss / batch_size, cls_loss / batch_size, obj_loss / batch_size, self.l_noobj * noobj_loss / batch_size
