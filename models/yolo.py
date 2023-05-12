@@ -32,9 +32,6 @@ class YOLO(nn.Module):
         x = self.classifier(x)
         
         x = x.view(-1, 7, 7, self.B * 5 + self.C)
-        
-        x[:, :, :, 4] = self.sigmoid(x[:, :, :, 4])
-        x[:, :, :, 10:] = self.sigmoid(x[:, :, :, 10:])
 
         return x
 
