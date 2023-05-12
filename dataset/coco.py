@@ -70,6 +70,7 @@ class COCODataset(Dataset):
         
         for bbox in bboxes:
             x1, y1, w, h, cls = bbox
+
             cx = (x1 + (w / 2))
             cy = (y1 + (h / 2))
             w = math.sqrt(w)
@@ -81,12 +82,12 @@ class COCODataset(Dataset):
             cell_y = cy / self.cell_size
             ty = cell_y - int(cell_y)
 
-            if target[int(cell_x)][int(cell_y)][4] != 0:
+            if target[int(cell_y)][int(cell_x)][4] != 0:
                 continue
 
-            target[int(cell_x)][int(cell_y)][0:5] = torch.tensor([tx, ty, w, h, 1.0])
-            target[int(cell_x)][int(cell_y)][5:10] = torch.tensor([tx, ty, w, h, 1.0])
-            target[int(cell_x)][int(cell_y)][5 * self.args.B + int(cls)] = 1.0
+            target[int(cell_y)][int(cell_x)][0:5] = torch.tensor([tx, ty, w, h, 1.0])
+            target[int(cell_y)][int(cell_x)][5:10] = torch.tensor([tx, ty, w, h, 1.0])
+            target[int(cell_y)][int(cell_x)][5 * self.args.B + int(cls)] = 1.0
 
         return target
 
