@@ -4,7 +4,7 @@ YOLOv1 Paper : [You Only Look Once: Unified, Real-Time Object Detection](https:/
 
 This code follows the contents of the paper as much as possible, but has the following differences.
 
-1. Use random select instead of respondable select due to bias occurring early in the training.
+1. ~~Use random select instead of respondable select due to bias occurring early in the training.~~
 
 2. To prevent data from being heavily modulated, color space variations are within the 20% range.
 
@@ -18,7 +18,7 @@ This code follows the contents of the paper as much as possible, but has the fol
 - [x] add demo.py
 - [x] non-maximum suppression
 - [x] add val.py
-- [ ] video demo
+- [x] video demo
 - [ ] upload pretrained weights
 
 
