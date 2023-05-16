@@ -28,6 +28,10 @@ class COCODataset(Dataset):
 
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
+            A.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
             # A.RandomCrop(self.img_size, self.img_size, p=0.2),
             # A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.1, p=0.2),
             ToTensorV2(),
@@ -53,7 +57,7 @@ class COCODataset(Dataset):
             bboxes.append([x1, y1, w, h, cls])
         
         augmented = self.transforms(image=img, bboxes=bboxes)
-        img = augmented['image'].float() / 255.0
+        img = augmented['image'].float()
         bboxes = augmented['bboxes']
         target = self.encoder(bboxes)
 
@@ -70,7 +74,7 @@ class COCODataset(Dataset):
         
         for bbox in bboxes:
             x1, y1, w, h, cls = bbox
-
+            
             cx = (x1 + (w / 2))
             cy = (y1 + (h / 2))
             w = math.sqrt(w)
@@ -130,8 +134,12 @@ class TestDataset(Dataset):
         self.img_size = args.img_size
         self.transforms = A.Compose([
             A.Resize(self.img_size, self.img_size),
+            A.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
             ToTensorV2(),
-        ])
+        ], bbox_params={'format' : 'coco'})
 
         if os.path.isdir(path):
             file_list = os.listdir(path)
@@ -159,7 +167,7 @@ class TestDataset(Dataset):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         augmented = self.transforms(image=img)
-        img = augmented['image'].float() / 255.0
+        img = augmented['image'].float()
 
         return img, ori_img, self.files[index]
 
