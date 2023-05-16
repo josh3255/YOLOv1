@@ -20,69 +20,104 @@ class YOLOLoss(nn.Module):
         self.mse_loss = torch.nn.MSELoss()
         self.ce_loss = torch.nn.CrossEntropyLoss()
     
-    def compute_iou(self, pred, target):
-        # pred: [x1, y1, x2, y2]
-        # target: [x1, y1, x2, y2]
-        
-        # Get coordinates of intersection rectangle
-        x1 = max(pred[0], target[0])
-        y1 = max(pred[1], target[1])
-        x2 = min(pred[2], target[2])
-        y2 = min(pred[3], target[3])
+    def compute_iou(self, box1, box2):
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2
 
-        # Calculate area of intersection rectangle
-        intersection = max(0, x2 - x1 + 1) * max(0, y2 - y1 + 1)
+        i_x1 = max(b1_x1, b2_x1)
+        i_y1 = max(b1_y1, b2_y1)
+        i_x2 = min(b1_x2, b2_x2)
+        i_y2 = min(b1_y2, b2_y2)
 
-        # Calculate area of union rectangle
-        pred_area = (pred[2] - pred[0] + 1) * (pred[3] - pred[1] + 1)
-        target_area = (target[2] - target[0] + 1) * (target[3] - target[1] + 1)
-        union = pred_area + target_area - intersection
+        inter_area = max(0, i_x2 - i_x1 + 1) * max(0, i_y2 - i_y1 + 1)
 
-        # Calculate IoU
-        iou = intersection / union
+        box1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
+        box2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
+
+        iou = inter_area / float(box1_area + box2_area - inter_area)
 
         return iou
+        
+
+    def responsible_masking(self, pred, target):
+        batch_size, rows, cols, _ = target.shape
+
+        for b in range(batch_size):
+            for c in range(cols):
+                for r in range(rows):
+                    if target[b, c, r, 4] > 0:
+                        pred1_tx, pred1_ty, pred1_w, pred1_h = pred[b, c, r, :4]
+
+                        pred1_cx = (pred1_tx + c) * (self.img_size // self.S)
+                        pred1_cy = (pred1_ty + r) * (self.img_size // self.S)
+                        pred1_w = pred1_w ** 2
+                        pred1_h = pred1_h ** 2
+
+                        box1 = [pred1_cx - pred1_w // 2, pred1_cy - pred1_h // 2,\
+                                 pred1_cx + pred1_w // 2, pred1_cy + pred1_h // 2]
+                        
+                        pred2_tx, pred2_ty, pred2_w, pred2_h = pred[b, c, r, :4]
+
+                        pred2_cx = (pred2_tx + c) * (self.img_size // self.S)
+                        pred2_cy = (pred2_ty + r) * (self.img_size // self.S)
+                        pred2_w = pred2_w ** 2
+                        pred2_h = pred2_h ** 2
+
+                        box2 = [pred2_cx - pred2_w // 2, pred2_cy - pred2_h // 2,\
+                                 pred2_cx + pred2_w // 2, pred2_cy + pred2_h // 2]
+
+                        g_tx, g_ty, g_w, g_h = target[b, c, r, :4]
+
+                        g_cx = (g_tx + c) * (self.img_size // self.S)
+                        g_cy = (g_ty + r) * (self.img_size // self.S)
+                        g_w = g_w ** 2
+                        g_h = g_h ** 2
+
+                        g_box1 = [g_cx - g_w // 2, g_cy - g_h // 2, g_cx + g_w // 2, g_cy + g_h // 2]
+
+                        iou1 = self.compute_iou(box1, g_box1)
+                        iou2 = self.compute_iou(box2, g_box1)
+                        
+                        if iou1 > iou2:
+                            target[b, c, r, 9] = 0
+                        elif iou2 > iou1:
+                            target[b, c, r, 4] = 0
+                        else:
+                            if random.random() > 0.5:
+                                target[b, c, r, 9] = 0
+                            else:
+                                target[b, c, r, 4] = 0
+                                
+        return pred, target
 
     def forward(self, pred, target):
         batch_size = pred.shape[0]
 
-        obj_mask = target[:, :, :, 4] > 0
-        noobj_mask = target[:, :, :, 4] == 0
-
-        obj_pred = pred[obj_mask]
-        noobj_pred = pred[noobj_mask]
-        obj_target = target[obj_mask]
-        noobj_target = target[noobj_mask]
-
-        pred_bbox1 = obj_pred[:, :4]
-        pred_bbox2 = obj_pred[:, 5:9]
-
-        pred_obj1 = obj_pred[:, 4]
-        pred_obj2 = obj_pred[:, 9]
-
-        pred_cls = obj_pred[:, 10:]
-
-        target_bbox1 = obj_target[:, :4]
-        target_bbox2 = obj_target[:, 5:9]
-
-        target_obj1 = obj_target[:, 4]
-        target_obj2 = obj_target[:, 9]
-
-        target_cls = obj_target[:, 10:]
+        pred, target = self.responsible_masking(pred, target)
         
-        # If you want to backward by selecting a box with a high iou instead of random backward
-        # you can remove the below and implement it using compute_iou function.
+        box1_obj_mask = target[:, :, :, 4] > 0
+        box2_obj_mask = target[:, :, :, 9] > 0
 
-        # Due to the bias that occurs during learning, do not use reponsible.
-        if random.random() > 0.5:
-            loc_loss = self.mse_loss(pred_bbox1, target_bbox1)
-            obj_loss = self.mse_loss(pred_obj1, target_obj1)
-        else:
-            loc_loss = self.mse_loss(pred_bbox2, target_bbox2)
-            obj_loss = self.mse_loss(pred_obj2, target_obj2)
+        noobj_mask = (target[:, :, :, 4] == 0) & (target[:, :, :, 9] == 0)
+    
+        pred_res1 = pred[box1_obj_mask]
+        pred_res2 = pred[box2_obj_mask]
+        pred_noobj = pred[noobj_mask]
         
-        cls_loss = self.mse_loss(pred_cls, target_cls)
-        noobj_loss = self.mse_loss(noobj_pred[:, 4], noobj_target[:, 4]) + \
-                        self.mse_loss(noobj_pred[:, 9], noobj_target[:, 9])
+        target_res1 = target[box1_obj_mask]
+        target_res2 = target[box2_obj_mask]
+        target_noobj = target[noobj_mask]
 
+        loc_loss = self.mse_loss(pred_res1[:, :4], target_res1[:, :4])\
+                    + self.mse_loss(pred_res2[:, 5:9], target_res2[:, 5:9])
+        
+        obj_loss = self.mse_loss(pred_res1[:, 4], target_res1[:, 4])\
+                    + self.mse_loss(pred_res2[:, 9], target_res2[:, 9])
+
+        cls_loss = self.mse_loss(pred_res1[:, 10:], target_res1[:, 10:])\
+                    + self.mse_loss(pred_res2[:, 10:], target_res2[:, 10:])
+
+        noobj_loss = self.mse_loss(pred_noobj[:, 4], target_noobj[:, 4])\
+                    + self.mse_loss(pred_noobj[:, 9], target_noobj[:, 9])
+        
         return self.l_coord * loc_loss / batch_size, cls_loss / batch_size, obj_loss / batch_size, self.l_noobj * noobj_loss / batch_size
