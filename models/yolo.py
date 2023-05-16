@@ -31,7 +31,7 @@ class YOLO(nn.Module):
         x = self.features(x)
         x = self.classifier(x)
         
-        x = x.view(-1, 7, 7, self.B * 5 + self.C)
+        x = x.view(-1, self.S, self.S, self.B * 5 + self.C)
 
         return x
 
